@@ -3,8 +3,8 @@ use crate::decoder::decode_binary;
 use crate::BufrKitError;
 use std::io;
 use std::fs::File;
-use crate::table::template::Template;
-use crate::table::table::{TableGroup, TableGroupId};
+use crate::table::template::{Template, PrintVisitor};
+use crate::table::table::{TableGroup, TableGroupId, TableGroupManager};
 
 pub trait Command {
     fn run(&mut self) -> Result<(), BufrKitError>;
@@ -53,7 +53,7 @@ impl<'a> Command for LookupCommand<'a> {
         for s in self.ids.split(",") {
             ids.push(s.parse::<isize>()?);
         }
-        let table_group = TableGroup::load(&TableGroupId {
+        let table_group = TableGroupManager::new().get_table_group(&TableGroupId {
             base_dir: String::from("_definitions/tables"),
             master_table_number: 0,
             centre_number: 0,
@@ -61,7 +61,7 @@ impl<'a> Command for LookupCommand<'a> {
             version_number: 25,
         }).unwrap();
         let template = Template::new(&table_group, &ids)?;
-        println!("{:?}", template);
+        template.accept(&mut PrintVisitor::new());
         Ok(())
     }
 }

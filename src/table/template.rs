@@ -34,6 +34,7 @@ impl Node {
                 } else {
                     self.children.borrow().iter().for_each(|node| node.accept(visitor));
                 }
+                visitor.exit_replication_descriptor()
             }
             Descriptor::Operator(descriptor) => {
                 visitor.visit_operator_descriptor(descriptor);
@@ -41,6 +42,7 @@ impl Node {
             Descriptor::Sequence(descriptor) => {
                 visitor.visit_sequence_descriptor(descriptor, self.children.borrow());
                 self.children.borrow().iter().for_each(|node| node.accept(visitor));
+                visitor.exit_sequence_descriptor()
             }
         }
     }
@@ -91,11 +93,57 @@ impl Template {
 }
 
 pub trait Visitor {
-    fn visit_element_descriptor(&self, descriptor: &ElementDescriptor);
-    fn visit_replication_descriptor(&self, descriptor: &ReplicationDescriptor, children: Ref<Vec<Rc<Node>>>);
-    fn visit_operator_descriptor(&self, descriptor: &OperatorDescriptor);
-    fn visit_sequence_descriptor(&self, descriptor: &SequenceDescriptor, children: Ref<Vec<Rc<Node>>>);
-    fn visit_replication_factor(&self, descriptor: &ElementDescriptor);
+    fn visit_element_descriptor(&mut self, descriptor: &ElementDescriptor);
+    fn visit_replication_descriptor(&mut self, descriptor: &ReplicationDescriptor, children: Ref<Vec<Rc<Node>>>);
+    fn visit_operator_descriptor(&mut self, descriptor: &OperatorDescriptor);
+    fn visit_sequence_descriptor(&mut self, descriptor: &SequenceDescriptor, children: Ref<Vec<Rc<Node>>>);
+    fn visit_replication_factor(&mut self, descriptor: &ElementDescriptor);
+    fn exit_replication_descriptor(&mut self);
+    fn exit_sequence_descriptor(&mut self);
+}
+
+pub struct PrintVisitor {
+    indent_level: usize
+}
+
+impl PrintVisitor {
+    pub fn new() -> Self {
+        PrintVisitor {
+            indent_level: 0,
+        }
+    }
+}
+
+impl Visitor for PrintVisitor {
+    fn visit_element_descriptor(&mut self, descriptor: &ElementDescriptor) {
+        println!("{:indent_level$}{}", "", descriptor, indent_level = self.indent_level);
+    }
+
+    fn visit_replication_descriptor<'b>(&mut self, descriptor: &ReplicationDescriptor, children: Ref<'b, Vec<Rc<Node>>>) {
+        println!("{:indent_level$}{}", "", descriptor, indent_level = self.indent_level);
+        self.indent_level += 4;
+    }
+
+    fn visit_operator_descriptor(&mut self, descriptor: &OperatorDescriptor) {
+        println!("{:indent_level$}{}", "", descriptor, indent_level = self.indent_level);
+    }
+
+    fn visit_sequence_descriptor<'b>(&mut self, descriptor: &SequenceDescriptor, children: Ref<'b, Vec<Rc<Node>>>) {
+        println!("{:indent_level$}{}", "", descriptor, indent_level = self.indent_level);
+        self.indent_level += 4;
+    }
+
+    fn visit_replication_factor(&mut self, descriptor: &ElementDescriptor) {
+        println!("{:indent_level$}{}", "", descriptor, indent_level = self.indent_level);
+    }
+
+    fn exit_replication_descriptor(&mut self) {
+        self.indent_level -= 4;
+    }
+
+    fn exit_sequence_descriptor(&mut self) {
+        self.indent_level -= 4;
+    }
 }
 
 fn expand_members(table_group: &TableGroup,

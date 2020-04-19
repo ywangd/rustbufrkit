@@ -87,7 +87,7 @@ impl Fxy for ReplicationDescriptor {
 
 impl Display for ReplicationDescriptor {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}", self.id.as_string())
+        write!(f, "{} {}", self.id.as_string(), if self.y() == 0 {"DELAYED REPLICATION"} else {"FIXED REPLICATION"})
     }
 }
 
