@@ -1,10 +1,54 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::path::{MAIN_SEPARATOR, Path, PathBuf};
-use crate::table::descriptor::{Descriptor, ElementDescriptor, ID, Fxy, SequenceDescriptor, OperatorDescriptor, ReplicationDescriptor};
+use crate::table::descriptor::{ID, Fxy};
 use std::fs::File;
 use crate::BufrKitError;
 use std::sync::{RwLock, Arc};
+
+pub enum Entry<'a> {
+    B(&'a BEntry),
+    R(REntry),
+    C(&'a CEntry),
+    D(&'a DEntry),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BEntry {
+    pub name: String,
+    pub unit: String,
+    pub scale: isize,
+    pub refval: isize,
+    pub nbits: isize,
+    pub unit_crex: String,
+    pub scale_crex: isize,
+    pub nchars_crex: isize,
+}
+
+pub struct REntry {
+    id: ID,
+}
+
+impl REntry {
+    pub fn n_members(&self) -> isize {
+        self.id.x()
+    }
+
+    pub fn n_repeats(&self) -> isize {
+        self.id.y()
+    }
+}
+
+pub struct CEntry {
+    pub name: String,
+    pub definition: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DEntry {
+    pub name: String,
+    pub members: Vec<isize>,
+}
 
 pub struct TableGroupManager {
     cache: RwLock<HashMap<TableGroupId, Arc<TableGroup>>>
@@ -18,7 +62,6 @@ impl TableGroupManager {
     }
 
     pub fn get_table_group(&self, table_group_id: &TableGroupId) -> Result<Arc<TableGroup>, BufrKitError> {
-
         if !self.cache.read().unwrap().contains_key(table_group_id) {
             let mut cache = self.cache.write().unwrap();
             cache.insert(table_group_id.clone(), Arc::new(TableGroup::load(table_group_id)?));
@@ -59,12 +102,12 @@ impl TableGroup {
     }
 
     /// lookup descriptor with the given id
-    pub fn lookup(&self, id: ID) -> Result<Descriptor, BufrKitError> {
+    pub fn lookup(&self, id: ID) -> Result<Entry, BufrKitError> {
         match id.f() {
-            0 => self.b.lookup(id),
-            1 => Ok(Descriptor::Replication(ReplicationDescriptor { id })),
-            2 => Ok(Descriptor::Operator(OperatorDescriptor { id })),
-            3 => self.d.lookup(id),
+            0 => Ok(Entry::B(self.b.lookup(id)?)),
+            1 => Ok(Entry::R(REntry { id })),
+            2 => Ok(Entry::C(self.mc.lookup(id)?)),
+            3 => Ok(Entry::D(self.d.lookup(id)?)),
             _ => Err(BufrKitError {
                 message: format!("{}: not a valid form of descriptor ID", id.as_string())
             }),
@@ -84,7 +127,10 @@ impl TableGroup {
     pub fn lookup_meta(&self, id: ID) -> Result<&str, BufrKitError> {
         match id.f() {
             0 => self.mb.lookup(id),
-            2 => self.mc.lookup(id),
+            2 => {
+                let centry = self.mc.lookup(id)?;
+                Ok(&centry.name)
+            }
             3 => self.md.lookup(id),
             _ => Err(BufrKitError {
                 message: format!("{}: metadata not found", id.as_string())
@@ -103,24 +149,6 @@ impl fmt::Display for TableGroup {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct BEntry {
-    name: String,
-    unit: String,
-    scale: isize,
-    refval: isize,
-    nbits: isize,
-    unit_crex: String,
-    scale_crex: isize,
-    nchars_crex: isize,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct DEntry {
-    pub name: String,
-    pub members: Vec<String>,
-}
-
 // =================================================
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TableB(HashMap<isize, BEntry>);
@@ -132,17 +160,10 @@ impl TableB {
         Ok(t)
     }
 
-    fn lookup(&self, id: ID) -> Result<Descriptor, BufrKitError> {
-        if let Some(entry) = self.0.get(&id) {
-            Ok(Descriptor::Element(ElementDescriptor {
-                id,
-                entry,
-            }))
-        } else {
-            Err(BufrKitError {
-                message: format!("{} not found", id.as_string())
-            })
-        }
+    fn lookup(&self, id: ID) -> Result<&BEntry, BufrKitError> {
+        self.0.get(&id).ok_or(BufrKitError {
+            message: format!("{} not found", id.as_string())
+        })
     }
 }
 
@@ -153,21 +174,25 @@ pub struct TableD(HashMap<isize, DEntry>);
 impl TableD {
     fn load(table_group_id: &TableGroupId) -> Result<Self, BufrKitError> {
         let ins = File::open(table_group_id.get_table_file(Name::TableD))?;
-        let t = serde_json::from_reader(ins)?;
-        Ok(t)
+        let content: HashMap<isize, (String, Vec<String>)> = serde_json::from_reader(ins)?;
+        let mut t = HashMap::new();
+        for (k, v) in content.into_iter() {
+            let mut members = Vec::new();
+            for vv in v.1.into_iter() {
+                members.push(vv.parse::<isize>()?);
+            }
+            t.insert(k, DEntry {
+                name: v.0,
+                members,
+            });
+        }
+        Ok(TableD(t))
     }
 
-    fn lookup(&self, id: ID) -> Result<Descriptor, BufrKitError> {
-        if let Some(entry) = self.0.get(&id) {
-            Ok(Descriptor::Sequence(SequenceDescriptor {
-                id,
-                entry,
-            }))
-        } else {
-            Err(BufrKitError {
-                message: format!("{} not found", id.as_string())
-            })
-        }
+    fn lookup(&self, id: ID) -> Result<&DEntry, BufrKitError> {
+        self.0.get(&id).ok_or(BufrKitError {
+            message: format!("{} not found", id.as_string())
+        })
     }
 }
 
@@ -275,7 +300,7 @@ impl MetaB {
 }
 
 pub struct MetaC {
-    entries: HashMap<String, String>,
+    entries: HashMap<String, CEntry>,
 }
 
 impl MetaC {
@@ -294,7 +319,7 @@ impl MetaC {
         for entry in content.entries.into_iter() {
             entries.insert(
                 format!("{}{}{}", entry.0, entry.1, entry.2),
-                format!("{}: {}", entry.3, entry.4),
+                CEntry { name: entry.3, definition: entry.4 },
             );
         }
 
@@ -303,11 +328,11 @@ impl MetaC {
         })
     }
 
-    fn lookup(&self, id: ID) -> Result<&str, BufrKitError> {
-        if let Some(entry) = self.entries.get(&id.as_string()) {
-            Ok(entry)
-        } else if let Some(entry) = self.entries.get(&format!("{:03}YYY", id.fx())) {
-            Ok(entry)
+    fn lookup(&self, id: ID) -> Result<&CEntry, BufrKitError> {
+        if let Some(centry) = self.entries.get(&id.as_string()) {
+            Ok(centry)
+        } else if let Some(centry) = self.entries.get(&format!("{:03}YYY", id.fx())) {
+            Ok(centry)
         } else {
             Err(BufrKitError { message: format!("{} not found", id.as_string()) })
         }

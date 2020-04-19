@@ -16,7 +16,7 @@ pub trait Fxy {
         self.id() / 1000
     }
     fn as_string(&self) -> String {
-        return format!("{:06}", self.id())
+        return format!("{:06}", self.id());
     }
 }
 
@@ -28,14 +28,15 @@ impl Fxy for ID {
     }
 }
 
-pub enum Descriptor<'a> {
-    Element(ElementDescriptor<'a>),
+#[derive(Debug)]
+pub enum Descriptor {
+    Element(ElementDescriptor),
     Replication(ReplicationDescriptor),
     Operator(OperatorDescriptor),
-    Sequence(SequenceDescriptor<'a>),
+    Sequence(SequenceDescriptor),
 }
 
-impl<'a> Fxy for Descriptor<'a> {
+impl Fxy for Descriptor {
     fn id(&self) -> ID {
         match self {
             Descriptor::Element(d) => d.id,
@@ -46,26 +47,34 @@ impl<'a> Fxy for Descriptor<'a> {
     }
 }
 
-impl<'a> Display for Descriptor<'a> {
+impl Display for Descriptor {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Descriptor::Element(d) => d.fmt(f),
-            _ => write!(f, "{}", self.id().as_string()),
+            Descriptor::Replication(d) => d.fmt(f),
+            Descriptor::Operator(d) => d.fmt(f),
+            Descriptor::Sequence(d) => d.fmt(f),
         }
     }
 }
 
-pub struct ElementDescriptor<'a>{
+#[derive(Debug)]
+pub struct ElementDescriptor {
     pub id: ID,
-    pub entry: &'a BEntry,
+    pub name: String,
+    pub unit: String,
+    pub scale: isize,
+    pub refval: isize,
+    pub nbits: isize,
 }
 
-impl<'a> Display for ElementDescriptor<'a> {
+impl Display for ElementDescriptor {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{} {:?}", self.id.as_string(), self.entry)
+        write!(f, "{} {}", self.id.as_string(), self.name)
     }
 }
 
+#[derive(Debug)]
 pub struct ReplicationDescriptor {
     pub id: ID,
 }
@@ -76,11 +85,44 @@ impl Fxy for ReplicationDescriptor {
     }
 }
 
-pub struct OperatorDescriptor {
-    pub id: ID,
+impl Display for ReplicationDescriptor {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{}", self.id.as_string())
+    }
 }
 
-pub struct SequenceDescriptor<'a> {
+#[derive(Debug)]
+pub struct OperatorDescriptor {
     pub id: ID,
-    pub entry: &'a DEntry,
+    pub name: String,
+}
+
+impl Display for OperatorDescriptor {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{} {}", self.id.as_string(), self.name)
+    }
+}
+
+impl Fxy for OperatorDescriptor {
+    fn id(&self) -> isize {
+        self.id
+    }
+}
+
+#[derive(Debug)]
+pub struct SequenceDescriptor {
+    pub id: ID,
+    pub name: String,
+}
+
+impl Fxy for SequenceDescriptor {
+    fn id(&self) -> isize {
+        self.id
+    }
+}
+
+impl Display for SequenceDescriptor {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{} {}", self.id.as_string(), self.name)
+    }
 }

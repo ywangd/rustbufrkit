@@ -2,7 +2,7 @@ use super::*;
 use crate::table::table::{TableGroup, TableGroupId, TableGroupManager};
 use std::ptr;
 use std::ops::Deref;
-use crate::table::template::{create_template_node, Node, Template};
+use crate::table::template::{expand_one, Node, Template};
 use std::cell::RefCell;
 use std::rc::{Weak, Rc};
 use std::borrow::Borrow;
@@ -66,12 +66,12 @@ fn test_lookup_meta() {
     );
 
     assert_eq!(
-        "Change data width: Add (YYY-128) bits to the data width given for each data element in Table B, other than CCITT IA5 (character) data, code or flag tables.",
+        "Change data width",
         table_group.lookup_meta(201011).unwrap(),
     );
 
     assert_eq!(
-        "Difference statistical values follow: The statistical values which follow relate to the data defined by the data present bit-map.",
+        "Difference statistical values follow",
         table_group.lookup_meta(225000).unwrap(),
     );
 
