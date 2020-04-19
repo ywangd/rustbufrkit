@@ -70,6 +70,12 @@ pub struct ReplicationDescriptor {
     pub id: ID,
 }
 
+impl Fxy for ReplicationDescriptor {
+    fn id(&self) -> isize {
+        self.id
+    }
+}
+
 pub struct OperatorDescriptor {
     pub id: ID,
 }

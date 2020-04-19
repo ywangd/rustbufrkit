@@ -54,6 +54,10 @@ impl TableGroup {
         Ok(TableGroup { id: table_group_id.clone(), b, d, cnf, ma, mb, mc, md })
     }
 
+    pub fn id(&self) -> &TableGroupId {
+        &self.id
+    }
+
     /// lookup descriptor with the given id
     pub fn lookup(&self, id: ID) -> Result<Descriptor, BufrKitError> {
         match id.f() {
@@ -113,8 +117,8 @@ pub struct BEntry {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DEntry {
-    name: String,
-    members: Vec<String>,
+    pub name: String,
+    pub members: Vec<String>,
 }
 
 // =================================================
@@ -372,7 +376,7 @@ impl fmt::Display for Name {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Default)]
 pub struct TableGroupId {
     pub base_dir: String,
     pub master_table_number: isize,

@@ -1,8 +1,10 @@
-use std::io::{BufReader};
-use crate::decoder::{decode_binary};
+use std::io::BufReader;
+use crate::decoder::decode_binary;
 use crate::BufrKitError;
 use std::io;
 use std::fs::File;
+use crate::table::template::Template;
+use crate::table::table::{TableGroup, TableGroupId};
 
 pub trait Command {
     fn run(&mut self) -> Result<(), BufrKitError>;
@@ -14,9 +16,9 @@ pub struct DecodeCommand<'a> {
 
 impl<'a> DecodeCommand<'a> {
     pub fn new(ins_name: &'a str) -> Self {
-        return DecodeCommand {
+        DecodeCommand {
             ins_name,
-        };
+        }
     }
 }
 
@@ -29,6 +31,37 @@ impl<'a> Command for DecodeCommand<'a> {
             decode_binary(&mut BufReader::new(file))?
         };
         println!("{:?}", bufr_message);
+        Ok(())
+    }
+}
+
+pub struct LookupCommand<'a> {
+    ids: &'a str,
+}
+
+impl<'a> LookupCommand<'a> {
+    pub fn new(ids: &'a str) -> Self {
+        LookupCommand {
+            ids,
+        }
+    }
+}
+
+impl<'a> Command for LookupCommand<'a> {
+    fn run(&mut self) -> Result<(), BufrKitError> {
+        let mut ids = Vec::new();
+        for s in self.ids.split(",") {
+            ids.push(s.parse::<isize>()?);
+        }
+        let table_group = TableGroup::load(&TableGroupId {
+            base_dir: String::from("_definitions/tables"),
+            master_table_number: 0,
+            centre_number: 0,
+            sub_centre_number: 0,
+            version_number: 25,
+        }).unwrap();
+        let template = Template::new(&table_group, &ids)?;
+        println!("{:?}", template);
         Ok(())
     }
 }

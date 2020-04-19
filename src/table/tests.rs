@@ -2,6 +2,10 @@ use super::*;
 use crate::table::table::{TableGroup, TableGroupId, TableGroupManager};
 use std::ptr;
 use std::ops::Deref;
+use crate::table::template::{create_template_node, Node, Template};
+use std::cell::RefCell;
+use std::rc::{Weak, Rc};
+use std::borrow::Borrow;
 
 #[test]
 fn test_table_group_manager() {
@@ -90,6 +94,15 @@ fn test_data_category_of() {
         "Reserved",
         table_group.data_category_of(100).unwrap(),
     );
+}
+
+#[test]
+fn test_template() {
+    let table_group = create_table_group();
+
+    let template = Template::new(
+        &table_group, &[302059, 1001]).unwrap();
+    println!("Template is {:?}", template)
 }
 
 fn create_table_group() -> TableGroup {

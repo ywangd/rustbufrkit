@@ -9,7 +9,6 @@ pub fn decode_binary(r: &mut dyn BufRead) -> Result<BufrMessage, BufrKitError> {
     let br = BitReader::new(bytes.borrow());
     let mut bd = BinaryDecoder {
         br,
-        has_section2: false,
     };
     let sections = bd.decode()?;
     Ok(BufrMessage::new(sections))
@@ -45,7 +44,6 @@ pub trait FieldReader {
 
 struct BinaryDecoder<'a> {
     br: BitReader<'a>,
-    has_section2: bool,
 }
 
 impl<'a> FieldReader for BinaryDecoder<'a> {
@@ -126,33 +124,90 @@ impl<'a> BinaryDecoder<'a> {
     }
 
     fn decode_section_1(&mut self, sections: &mut Vec<BufrSection>) -> Result<(), BufrKitError> {
-        sections.push(BufrSection::new(1, vec!(
-            self.read_field_u32("section_length", 24)?,
-            self.read_field_u32("master_table_number", 8)?,
-            self.read_field_u32("originating_centre", 16)?,
-            self.read_field_u32("originating_subcentre", 16)?,
-            self.read_field_u32("update_sequence_number", 8)?,
-            self.read_field_bool("is_section2_presents")?,
-            self.read_field_flag("flag_bits", 7)?,
-            self.read_field_u32("data_category", 8)?,
-            self.read_field_u32("data_i18n_subcategory", 8)?,
-            self.read_field_u32("data_local_subcategory", 8)?,
-            self.read_field_u32("master_table_version", 8)?,
-            self.read_field_u32("local_table_version", 8)?,
-            self.read_field_u32("year", 16)?,
-            self.read_field_u32("month", 8)?,
-            self.read_field_u32("day", 8)?,
-            self.read_field_u32("hour", 8)?,
-            self.read_field_u32("minute", 8)?,
-            self.read_field_u32("second", 8)?,
-        )));
-
-        self.has_section2 = sections[1].field(5).get_bool();
-        Ok(())
+        let edition = sections[0].field_by_name("edition").get_u32();
+        match edition {
+            1 => Ok(sections.push(BufrSection::new(1, vec!(
+                self.read_field_u32("originating_centre", 16)?,
+                self.read_field_u32("update_sequence_number", 8)?,
+                self.read_field_bool("is_section2_presents")?,
+                self.read_field_flag("flag_bits", 7)?,
+                self.read_field_u32("data_category", 8)?,
+                self.read_field_u32("data_local_subcategory", 8)?,
+                self.read_field_u32("master_table_version", 8)?,
+                self.read_field_u32("local_table_version", 8)?,
+                self.read_field_u32("year", 8)?,
+                self.read_field_u32("month", 8)?,
+                self.read_field_u32("day", 8)?,
+                self.read_field_u32("hour", 8)?,
+                self.read_field_u32("minute", 8)?,
+                self.read_field_u32("second", 8)?,
+            )))),
+            2 => Ok(sections.push(BufrSection::new(1, vec!(
+                self.read_field_u32("section_length", 24)?,
+                self.read_field_u32("master_table_number", 8)?,
+                self.read_field_u32("originating_centre", 16)?,
+                self.read_field_u32("update_sequence_number", 8)?,
+                self.read_field_bool("is_section2_presents")?,
+                self.read_field_flag("flag_bits", 7)?,
+                self.read_field_u32("data_category", 8)?,
+                self.read_field_u32("data_local_subcategory", 8)?,
+                self.read_field_u32("master_table_version", 8)?,
+                self.read_field_u32("local_table_version", 8)?,
+                self.read_field_u32("year", 8)?,
+                self.read_field_u32("month", 8)?,
+                self.read_field_u32("day", 8)?,
+                self.read_field_u32("hour", 8)?,
+                self.read_field_u32("minute", 8)?,
+                self.read_field_u32("second", 8)?,
+            )))),
+            3 => Ok(sections.push(BufrSection::new(1, vec!(
+                self.read_field_u32("section_length", 24)?,
+                self.read_field_u32("master_table_number", 8)?,
+                self.read_field_u32("originating_subcentre", 8)?,
+                self.read_field_u32("originating_centre", 8)?,
+                self.read_field_u32("update_sequence_number", 8)?,
+                self.read_field_bool("is_section2_presents")?,
+                self.read_field_flag("flag_bits", 7)?,
+                self.read_field_u32("data_category", 8)?,
+                self.read_field_u32("data_i18n_subcategory", 8)?,
+                self.read_field_u32("data_local_subcategory", 8)?,
+                self.read_field_u32("master_table_version", 8)?,
+                self.read_field_u32("local_table_version", 8)?,
+                self.read_field_u32("year", 8)?,
+                self.read_field_u32("month", 8)?,
+                self.read_field_u32("day", 8)?,
+                self.read_field_u32("hour", 8)?,
+                self.read_field_u32("minute", 8)?,
+                self.read_field_u32("second", 8)?,
+            )))),
+            4 => Ok(sections.push(BufrSection::new(1, vec!(
+                self.read_field_u32("section_length", 24)?,
+                self.read_field_u32("master_table_number", 8)?,
+                self.read_field_u32("originating_centre", 16)?,
+                self.read_field_u32("originating_subcentre", 16)?,
+                self.read_field_u32("update_sequence_number", 8)?,
+                self.read_field_bool("is_section2_presents")?,
+                self.read_field_flag("flag_bits", 7)?,
+                self.read_field_u32("data_category", 8)?,
+                self.read_field_u32("data_i18n_subcategory", 8)?,
+                self.read_field_u32("data_local_subcategory", 8)?,
+                self.read_field_u32("master_table_version", 8)?,
+                self.read_field_u32("local_table_version", 8)?,
+                self.read_field_u32("year", 16)?,
+                self.read_field_u32("month", 8)?,
+                self.read_field_u32("day", 8)?,
+                self.read_field_u32("hour", 8)?,
+                self.read_field_u32("minute", 8)?,
+                self.read_field_u32("second", 8)?,
+            )))),
+            _ => Err(BufrKitError {
+                message: format!("Unknown BUFR edition number: {}", edition)
+            })
+        }
     }
 
     fn decode_section_2(&mut self, sections: &mut Vec<BufrSection>) -> Result<(), BufrKitError> {
-        if self.has_section2 {
+        if sections[1].field_by_name("is_section2_presents").get_bool() {
             let field = self.read_field_u32("section_length", 24)?;
             let n_local_bits = ((field.get_u32() - 4) * 8) as usize;
             sections.push(BufrSection::new(2, vec!(

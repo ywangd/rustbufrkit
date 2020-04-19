@@ -41,13 +41,17 @@ impl BufrMessage {
 pub struct BufrSection {
     index: u8,
     fields: Vec<Field>,
+    lookup: HashMap<String, usize>,
 }
 
 impl BufrSection {
     pub fn new(index: u8, fields: Vec<Field>) -> Self {
+        let lookup = fields.iter().enumerate()
+            .map(|(i, f)| (f.name().to_owned(), i)).collect();
         BufrSection {
             index,
             fields,
+            lookup,
         }
     }
 
@@ -61,8 +65,12 @@ impl BufrSection {
         };
     }
 
+    pub fn field_by_name(&self, name: &str) -> &Field {
+        self.field(*self.lookup.get(name).unwrap())
+    }
+
     pub fn field(&self, i: usize) -> &Field {
-        return &self.fields[i];
+        &self.fields[i]
     }
 }
 
@@ -110,6 +118,13 @@ pub enum Field {
 }
 
 impl Field {
+    pub fn name(&self) -> &str {
+        match self {
+            Field::SIMPLE(f) => &f.name,
+            Field::UED(f) => &f.name,
+        }
+    }
+
     pub fn get_simple_value(&self) -> &SimpleData {
         return if let Field::SIMPLE(f) = self {
             &f.value

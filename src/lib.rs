@@ -19,11 +19,12 @@ use std::io::{Error};
 use std::fs::File;
 
 use clap::{App, Arg, SubCommand, ArgMatches};
-use crate::cmd::{Command, DecodeCommand};
+use crate::cmd::{Command, DecodeCommand, LookupCommand};
 use bitreader::BitReaderError;
+use std::num::ParseIntError;
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct BufrKitError {
     message: String,
 }
@@ -38,6 +39,14 @@ impl From<Error> for BufrKitError {
 
 impl From<BitReaderError> for BufrKitError {
     fn from(e: BitReaderError) -> Self {
+        BufrKitError {
+            message: format!("{}", e)
+        }
+    }
+}
+
+impl From<ParseIntError> for BufrKitError {
+    fn from(e: ParseIntError) -> Self {
         BufrKitError {
             message: format!("{}", e)
         }
@@ -77,6 +86,12 @@ pub fn new_app<'a, 'b>() -> App<'a, 'b> {
                 .default_value("-")
                 .required(false)
                 .index(1)))
+        .subcommand(SubCommand::with_name("lookup")
+            .about("Lookup BUFR descriptors")
+            .arg(Arg::with_name("IDS")
+                .help("Comma separated list of descriptor IDs")
+                .required(true)
+                .index(1)))
 }
 
 pub fn run_app() -> Result<(), BufrKitError> {
@@ -84,6 +99,7 @@ pub fn run_app() -> Result<(), BufrKitError> {
     match matches.subcommand() {
         ("decode", Some(sub_m)) => run_decoder(sub_m),
         ("encode", Some(sub_m)) => unimplemented!("encode"),
+        ("lookup", Some(sub_m)) => run_lookup(sub_m),
         (s, _) => Err(BufrKitError {
             message: format!("Unknown command: [{}]", s)
         })
@@ -96,3 +112,8 @@ fn run_decoder(matches: &ArgMatches) -> Result<(), BufrKitError> {
     cmd.run()
 }
 
+fn run_lookup(matches: &ArgMatches) -> Result<(), BufrKitError> {
+    let ids = matches.value_of("IDS").unwrap();
+    let mut cmd = LookupCommand::new(ids);
+    cmd.run()
+}
