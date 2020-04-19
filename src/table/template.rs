@@ -5,7 +5,7 @@ use std::borrow::{Borrow, BorrowMut};
 use std::sync::Arc;
 use std::convert::TryInto;
 use std::ops::Deref;
-use std::cell::RefCell;
+use std::cell::{RefCell, Ref};
 use std::rc::{Rc, Weak};
 use std::fmt;
 use serde::export::Formatter;
@@ -18,6 +18,40 @@ pub struct Node {
     pub descriptor: Descriptor,
     pub parent: RefCell<Weak<Node>>,
     pub children: RefCell<Vec<Rc<Node>>>,
+}
+
+impl Node {
+    pub fn accept(&self, visitor: &mut dyn Visitor) {
+        match &self.descriptor {
+            Descriptor::Element(descriptor) => {
+                visitor.visit_element_descriptor(descriptor)
+            }
+            Descriptor::Replication(descriptor) => {
+                visitor.visit_replication_descriptor(descriptor, self.children.borrow());
+                if descriptor.y() == 0 {
+                    self.children.borrow().iter().enumerate().for_each(|(i, node)|
+                        if i == 0 { node.accept_replication_factor(visitor) } else { node.accept(visitor) })
+                } else {
+                    self.children.borrow().iter().for_each(|node| node.accept(visitor));
+                }
+            }
+            Descriptor::Operator(descriptor) => {
+                visitor.visit_operator_descriptor(descriptor);
+            }
+            Descriptor::Sequence(descriptor) => {
+                visitor.visit_sequence_descriptor(descriptor, self.children.borrow());
+                self.children.borrow().iter().for_each(|node| node.accept(visitor));
+            }
+        }
+    }
+
+    fn accept_replication_factor(&self, visitor: &mut dyn Visitor) {
+        if let Descriptor::Element(descriptor) = &self.descriptor {
+            visitor.visit_replication_factor(descriptor);
+        } else {
+            panic!("Expected an element descriptor as replication factor, got {}", &self.descriptor)
+        }
+    }
 }
 
 impl fmt::Display for Node {
@@ -48,6 +82,20 @@ impl Template {
             root,
         })
     }
+
+    pub fn accept(&self, visitor: &mut dyn Visitor) {
+        for node in self.root.children.borrow().iter() {
+            node.accept(visitor)
+        }
+    }
+}
+
+pub trait Visitor {
+    fn visit_element_descriptor(&self, descriptor: &ElementDescriptor);
+    fn visit_replication_descriptor(&self, descriptor: &ReplicationDescriptor, children: Ref<Vec<Rc<Node>>>);
+    fn visit_operator_descriptor(&self, descriptor: &OperatorDescriptor);
+    fn visit_sequence_descriptor(&self, descriptor: &SequenceDescriptor, children: Ref<Vec<Rc<Node>>>);
+    fn visit_replication_factor(&self, descriptor: &ElementDescriptor);
 }
 
 fn expand_members(table_group: &TableGroup,
