@@ -24,11 +24,12 @@ impl<'a> DecodeCommand<'a> {
 
 impl<'a> Command for DecodeCommand<'a> {
     fn run(&mut self) -> Result<(), BufrKitError> {
+        let table_group_manager = TableGroupManager::new();
         let bufr_message = if self.ins_name == "-" {
-            decode_binary(&mut io::stdin().lock())?
+            decode_binary(&table_group_manager, &mut io::stdin().lock())?
         } else {
             let file = File::open(self.ins_name).unwrap();
-            decode_binary(&mut BufReader::new(file))?
+            decode_binary(&table_group_manager, &mut BufReader::new(file))?
         };
         println!("{:?}", bufr_message);
         Ok(())

@@ -424,14 +424,21 @@ impl TableGroupId {
     fn get_table_file(&self, name: Name) -> PathBuf {
         let filename = format!("{}.{}", name, "json");
         let base = Path::new(&self.base_dir);
-        let p = base.join(self.master_table_number.to_string())
+        let mut p = base.join(self.master_table_number.to_string())
             .join(format!("{}_{}", self.centre_number, self.sub_centre_number))
             .join(self.version_number.to_string())
             .join(&filename);
+
         if p.exists() {
-            p
-        } else {
-            base.join("common").join(&filename)
+            return p;
         }
+        p = base.join("common").join(&filename);
+        if p.exists() {
+            return p;
+        }
+        base.join(self.master_table_number.to_string())
+            .join("0_0")
+            .join(self.version_number.to_string())
+            .join(&filename)
     }
 }

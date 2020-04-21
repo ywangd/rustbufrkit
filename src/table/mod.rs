@@ -1,5 +1,5 @@
 pub mod table;
-mod descriptor;
+pub mod descriptor;
 pub mod template;
 
 #[cfg(test)]

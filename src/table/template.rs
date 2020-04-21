@@ -172,7 +172,7 @@ pub fn expand_one(table_group: &TableGroup,
                 unit: bentry.unit.to_owned(),
                 scale: bentry.scale,
                 refval: bentry.refval,
-                nbits: bentry.nbits,
+                nbits: bentry.nbits as u8,
             }), vec![])
         }
         Entry::C(centry) => {

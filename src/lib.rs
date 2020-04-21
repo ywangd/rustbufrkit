@@ -7,9 +7,10 @@ extern crate serde_json;
 #[macro_use]
 extern crate lazy_static;
 
-mod table;
-mod bufr;
+pub mod table;
+pub mod bufr;
 pub mod decoder;
+pub mod payload;
 mod cmd;
 
 #[cfg(test)]

@@ -65,7 +65,7 @@ pub struct ElementDescriptor {
     pub unit: String,
     pub scale: isize,
     pub refval: isize,
-    pub nbits: isize,
+    pub nbits: u8,
 }
 
 impl Display for ElementDescriptor {

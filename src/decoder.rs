@@ -3,11 +3,15 @@ use crate::bufr::{BufrMessage, BufrSection, Field, FieldSimple, FieldUED, Simple
 use crate::BufrKitError;
 use bitreader::{BitReader, BitReaderError};
 use std::borrow::{Borrow, BorrowMut};
+use crate::table::table::{TableGroupManager, TableGroupId, TableGroup};
+use crate::table::template::{Template, PrintVisitor};
 
-pub fn decode_binary(r: &mut dyn BufRead) -> Result<BufrMessage, BufrKitError> {
+pub fn decode_binary(table_group_manager: &TableGroupManager,
+                     r: &mut dyn BufRead) -> Result<BufrMessage, BufrKitError> {
     let bytes = prepare(r)?;
     let br = BitReader::new(bytes.borrow());
     let mut bd = BinaryDecoder {
+        table_group_manager,
         br,
     };
     let sections = bd.decode()?;
@@ -39,10 +43,11 @@ pub trait FieldReader {
     fn read_field_flag(&mut self, name: &str, nbits: u8) -> Result<Field, BufrKitError>;
     fn read_field_raw(&mut self, name: &str, nbits: usize) -> Result<Field, BufrKitError>;
     fn read_field_ued(&mut self, name: &str, n: usize) -> Result<Field, BufrKitError>;
-    fn read_field_td(&mut self, name: &str, nbits: usize) -> Result<Field, BufrKitError>;
+    fn read_field_payload(&mut self, name: &str, nbits: usize, template: &Template) -> Result<Field, BufrKitError>;
 }
 
 struct BinaryDecoder<'a> {
+    table_group_manager: &'a TableGroupManager,
     br: BitReader<'a>,
 }
 
@@ -89,8 +94,8 @@ impl<'a> FieldReader for BinaryDecoder<'a> {
         Ok(Field::UED(FieldUED::new(name, ids)))
     }
 
-    fn read_field_td(&mut self, name: &str, nbits: usize) -> Result<Field, BufrKitError> {
-        unimplemented!()
+    fn read_field_payload(&mut self, name: &str, nbits: usize, template: &Template) -> Result<Field, BufrKitError> {
+        Err(BufrKitError { message: "".to_owned() })
     }
 }
 
@@ -120,11 +125,11 @@ impl<'a> BinaryDecoder<'a> {
             fields.push(field);
             sections.push(BufrSection::new(0, fields));
             Ok(())
-        }
+        };
     }
 
     fn decode_section_1(&mut self, sections: &mut Vec<BufrSection>) -> Result<(), BufrKitError> {
-        let edition = sections[0].field_by_name("edition").get_u32();
+        let edition = sections[0].field_by_name("edition").unwrap().get_u32();
         match edition {
             1 => Ok(sections.push(BufrSection::new(1, vec!(
                 self.read_field_u32("originating_centre", 16)?,
@@ -207,7 +212,7 @@ impl<'a> BinaryDecoder<'a> {
     }
 
     fn decode_section_2(&mut self, sections: &mut Vec<BufrSection>) -> Result<(), BufrKitError> {
-        if sections[1].field_by_name("is_section2_presents").get_bool() {
+        if sections[1].field_by_name("is_section2_presents").unwrap().get_bool() {
             let field = self.read_field_u32("section_length", 24)?;
             let n_local_bits = ((field.get_u32() - 4) * 8) as usize;
             sections.push(BufrSection::new(2, vec!(
@@ -235,6 +240,7 @@ impl<'a> BinaryDecoder<'a> {
 
         fields.push(self.read_field_ued("unexpanded_descriptors", n_descriptors)?);
         sections.push(BufrSection::new(3, fields));
+        // TODO: consume padding data if any
         Ok(())
     }
 
@@ -244,6 +250,22 @@ impl<'a> BinaryDecoder<'a> {
         let mut fields = vec!(field);
         fields.push(self.read_field_flag("reserved_bits", 8)?);
 
+        let section_1 = sections.get(1).unwrap();
+        let table_group_id = TableGroupId {
+            base_dir: "_definitions/tables".to_owned(),
+            master_table_number: section_1.field_by_name("master_table_number").unwrap().get_u32() as isize,
+            centre_number: section_1.field_by_name("originating_centre").unwrap().get_u32() as isize,
+            sub_centre_number: section_1.field_by_name("originating_subcentre").map_or_else(|| 0, |f| f.get_u32()) as isize,
+            version_number: section_1.field_by_name("master_table_version").unwrap().get_u32() as isize,
+        };
+        let table_group = self.table_group_manager.get_table_group(&table_group_id)?;
+        let section_3 = sections.get(3).unwrap();
+        let unexpanded_descriptors = section_3
+            .field_by_name("unexpanded_descriptors")
+            .unwrap()
+            .get_unexpanded_descriptors();
+        let mut template = Template::new(&table_group, unexpanded_descriptors)?;
+
         fields.push(self.read_field_raw("template_data", n_data_bits)?);
         sections.push(BufrSection::new(4, fields));
         Ok(())
@@ -252,13 +274,13 @@ impl<'a> BinaryDecoder<'a> {
     fn decode_section_5(&mut self, sections: &mut Vec<BufrSection>) -> Result<(), BufrKitError> {
         let field = self.read_field_bytes("stop_signature", 4)?;
         return if field.get_bytes() != "7777" {
-            Err(BufrKitError{
+            Err(BufrKitError {
                 message: format!("Stop signature expected, found: {}", field.get_bytes())
             })
         } else {
             sections.push(BufrSection::new(5, vec!(field)));
             Ok(())
-        }
+        };
     }
 }
 
